@@ -1,3 +1,15 @@
+type envType = 'local' | 'vds' | 'github';
+
+const env: envType = 'local';
+
+let url: string = '';
+
+if (env === 'local') {
+  url = 'http://localhost:3000/api/vacancy';
+} else if (env === 'github'){
+  url = '';
+}
+
 // Выпадающие списки
 
 const optionBtnOrder = document.querySelector('.option__btn_order');
@@ -93,3 +105,100 @@ overlayVacancy.addEventListener('click', (e) => {
         overlayVacancy.classList.remove('overlay_active');
     }
 })
+
+// Вывод карточек
+
+const createCard = (vacancy) => {
+
+  const {
+    title,
+    id, 
+    compensation, 
+    workSchedule, 
+    employer,
+    address,
+    description,
+    date,
+   } = vacancy;
+
+  const card = document.createElement('li');
+  card.classList.add('result__item');
+
+  card.insertAdjacentHTML('afterbegin', `
+    <li class="result__item">
+      <article class="vacancy">
+      <h2 class="vacancy__title">
+          <a class="vacancy__open-modal" href="#" data-vacancy="${id}">${title}</a>
+      </h2>
+      <p class="vacancy__compensation">${compensation}</p>
+      <p class="vacancy__work-schedule">${workSchedule}</p>
+      <div class="vacancy__employer">
+          <p class="vacancy__employer-title">${employer}</p>
+          <p class="vacancy__employer-address">${address}</p>
+      </div>
+      <p class="vacancy__description">${description}</p>
+      <p class="vacancy__date">
+          <time datetime="${date}">${date}</time>
+      </p>
+      <div class="vacancy__wrapper-btn">
+          <a class="vacancy__response vacancy__open-modal" href="#" data-vacancy="${id}">Откликнуться</a>
+          <button class="vacancy__contacts">Показать контакты</button>
+      </div>
+      </article>
+    </li>
+    `);
+
+    return card;
+};
+
+const renderCards = (data) => {
+  resultList.textContent = '';
+  const cards = data.map(createCard);
+  resultList.append(...cards);
+};
+
+const getData = ({search}: any = {}): Promise<object> => {
+  if (search) {
+    return fetch(`${url}?search=${search}`).then(response => response.json());
+  }
+  return fetch(url).then(response => response.json());
+}
+
+const formSearch: any =  document.querySelector('.bottom__search');
+
+
+formSearch.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const textSearch: string = formSearch.search.value;
+  
+  const updateVacanciesListTitle = (vacanciesCount: number, searchString: string): void => {
+    const found = document.querySelector('.found');
+    found.textContent = '';
+    found.appendChild(document.createTextNode(`${vacanciesCount} вакансий «`));
+    const foundItem = document.createElement('span');
+    foundItem.classList.add('found__item');
+    foundItem.textContent = searchString;
+    found.appendChild(foundItem);
+    found.appendChild(document.createTextNode(`»`));
+  }
+
+  if (textSearch.length > 2) {
+    formSearch.search.style.borderColor = '';
+    const data = await getData({search: textSearch});
+    updateVacanciesListTitle(Object.keys(data).length, textSearch);
+    renderCards(data);
+    formSearch.reset();
+  } else {
+    formSearch.search.style.borderColor = 'red';
+    setTimeout(() => {
+      formSearch.search.style.borderColor = '';
+    }, 2000);
+  }
+});
+
+const init = async (): Promise<any> => {
+  const data = await getData();
+  console.log(data);
+  renderCards(data);
+}
+init();
