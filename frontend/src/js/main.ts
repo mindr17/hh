@@ -2,28 +2,27 @@ type envType = 'local' | 'vds' | 'github';
 
 const env: envType = 'local';
 
-let url: string = '';
+let baseUrl: string = '';
 
 if (env === 'local') {
-  url = 'http://localhost:3000/api/vacancy';
+  baseUrl = 'http://localhost:3000/api/vacancy';
 } else if (env === 'github'){
-  url = '';
+  baseUrl = '';
 }
 
 const optionBtnOrder = document.querySelector('.option__btn_order');
 const optionBtnPeriod = document.querySelector('.option__btn_period');
 const optionListOrder = document.querySelector('.option__list_order');
 const optionListPeriod = document.querySelector('.option__list_period');
-
 const topCityBtn = document.querySelector('.top__city');
 const city = document.querySelector('.city');
 const cityClose = document.querySelector('.city__close');
 const cityRegionList = document.querySelector('.city__region-list');
-
 const overlayVacancy = document.querySelector('.overlay_vacancy');
 const resultList = document.querySelector('.result__list');
-
 const formSearch: any =  document.querySelector('.bottom__search');
+const orderBy: any = document.querySelector('#order_by');
+const searchPeriod: any = document.querySelector('#search_period');
 
 // возвращает число и слово
 const declOfNum = (n, titles) => { return n + ' ' + titles[n % 10 === 1 && n % 100 !== 11 ?
@@ -78,11 +77,37 @@ const renderCards = (data) => {
   resultList.append(...cards);
 };
 
-const getData = ({search, id}: any = {}): Promise<object> => {
-  if (search) {
-    return fetch(`${url}?search=${search}`).then(response => response.json());
+const sortData = () => {
+  switch (orderBy.value) {
+    case 'down': 
+      data.sort((a, b) => a.minCompensation > b.minCompensation ? 1 : -1);
+      break;
+    case 'up':
+      data.sort((a, b) => a.minCompensation > b.minCompensation ? -1 : 1);
+      break;
+    default: 
+      data.sort((a, b) => new Date(a.date).getTime() > new Date(b.date).getTime() ? 1 : -1);
   }
-  return fetch(`${url}/${id ? id : ''}`).then(response => response.json());
+};
+
+let data = [];
+
+const getData = ({search, id, country, city}: any = {}): Promise<any> => {
+  let url = `${baseUrl}/${id ? id : ''}`;
+
+  if (search) {
+    url = `${baseUrl}?search=${search}`;
+  }
+  
+  if (city) {
+    url = `${baseUrl}?city=${city}`;
+  }
+  
+  if (country) {
+    url = `${baseUrl}?country=${country}`;
+  }
+
+  return fetch(url).then(response => response.json());
 }
 
 const updateVacanciesListTitle = (vacanciesCount?: number, searchString?: string): void => {
@@ -103,6 +128,12 @@ const updateVacanciesListTitle = (vacanciesCount?: number, searchString?: string
 }
 updateVacanciesListTitle();
 
+const filterData = (): any => {
+  const date: any = new Date();
+  date.setDate(date.getDate() - searchPeriod.value);
+  return data.filter(item => new Date(item.date).getTime() > date);
+}
+
 const optionHandler = (): void => {
   optionBtnOrder.addEventListener('click', (e) => {
     optionListOrder.classList.toggle('option__list_active');
@@ -115,9 +146,13 @@ const optionHandler = (): void => {
   });
 
   optionListOrder.addEventListener('click', (event) => {
-    const target = event.target as HTMLElement;
+    const target: any = event.target;
+
     if (target.classList.contains('option__item')) {
       optionBtnOrder.textContent = target.textContent;
+      orderBy.value = target.dataset.sort;
+      sortData();
+      renderCards(data);
       optionListOrder.classList.remove('option__list_active');
       for (const elem of optionListOrder.querySelectorAll('.option__item')) {
         if (elem === target) {
@@ -133,6 +168,9 @@ const optionHandler = (): void => {
     const target = event.target as HTMLElement;
     if (target.classList.contains('option__item')) {
       optionBtnPeriod.textContent = target.textContent;
+      searchPeriod.value = target.dataset.date;
+      const tempData = filterData();
+      renderCards(tempData);
       optionListPeriod.classList.remove('option__list_active');
       for (const elem of optionListPeriod.querySelectorAll('.option__item')) {
         if (elem === target) {
@@ -150,9 +188,18 @@ const cityHandler = (): void => {
     city.classList.toggle('city_active');
   })
 
-  cityRegionList.addEventListener('click', (event) => {
-    const target = event.target as HTMLElement;
+  cityRegionList.addEventListener('click', async (event) => {
+    const target: any = event.target;
+
     if (target.classList.contains('city__link')) {
+      const hash = new URL(target.href).hash.substring(1);
+      const option = {
+        [hash]: target.textContent,
+      }
+      data = await getData(option);
+      sortData();
+      data = filterData();
+      renderCards(data);
       topCityBtn.textContent = target.textContent;
       city.classList.remove('city_active');
     }
@@ -280,7 +327,9 @@ const searchHandler = (): void => {
     const textSearch: string = formSearch.search.value;
     if (textSearch.length > 2) {
       formSearch.search.style.borderColor = '';
-      const data = await getData({search: textSearch});
+      data = await getData({search: textSearch});
+      sortData();
+      data = filterData();
       updateVacanciesListTitle(Object.keys(data).length, textSearch);
       renderCards(data);
       formSearch.reset();
@@ -294,8 +343,9 @@ const searchHandler = (): void => {
 }
 
 const init = async (): Promise<void> => {
-  const data = await getData();
-  console.log(data);
+  data = await getData();
+  sortData();
+  data = filterData();
   renderCards(data);
   
   optionHandler();
